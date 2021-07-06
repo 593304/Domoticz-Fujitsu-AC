@@ -3,7 +3,7 @@
 # Author: 593304
 #
 """
-<plugin key="FujitsuACPlugin" name="Fujitsu AC Plugin" author="593304" version="0.2" externallink="https://github.com/593304/Domoticz-Fujitsu-AC">
+<plugin key="FujitsuACPlugin" name="Fujitsu AC Plugin" author="593304" version="0.3" externallink="https://github.com/593304/Domoticz-Fujitsu-AC">
     <description>
         <h2>Fujitsu AC Plugin</h2><br/>
         <p>The plugin will connect to the cloud solution behind the FGLair app to control your air conditioner. The FGLair app's username(e-mail address) and password is necessary.</p>
@@ -78,14 +78,30 @@ class Heartbeat():
     def __init__(self, interval):
         self.callback = None
         self.interval = interval
+        self.heartbeatRate = 15
+        self.heartbeatRoundCounter = 0
+        self.heartbeatRound = self.interval / self.heartbeatRate
 
     def setHeartbeat(self, callback):
-        Domoticz.Heartbeat(self.interval)
+        if self.interval > 30:
+            Domoticz.Heartbeat(self.heartbeatRate)
+        else:
+            Domoticz.Heartbeat(self.interval)
         Domoticz.Log("Heartbeat interval is %s seconds" % (str(self.interval)))
         self.callback = callback
             
     def beatHeartbeat(self):
-        self.callback()
+        callbackEnabled = False
+        if self.interval > 30:
+            self.heartbeatRoundCounter += 1
+            if self.heartbeatRoundCounter == int(self.heartbeatRound):
+                callbackEnabled = True
+                self.heartbeatRoundCounter = 0
+        else:
+            callbackEnabled = True
+
+        if callbackEnabled:
+            self.callback()
 
 
 class Helper():
@@ -180,7 +196,12 @@ class Helper():
             "dsn": dsn,
             "command": self.powerSwitch,
             "update": self.updateDomoticzDevice,
-            "currentValue": self.powerSwitchCurrentValue
+            "currentValue": self.powerSwitchCurrentValue,
+            "dependantSwitch": {
+                "unit": unitClass + 3,
+                "ifValue": "off",
+                "setValue": 10
+            }
         }
 
         unit = unitClass + 2
@@ -405,6 +426,9 @@ class Helper():
         dsn = self.units[unit]["dsn"]
         updateValues = self.units[unit]["command"](unit, dsn, command, str(level))
         self.units[unit]["update"](unit, updateValues["nValue"], updateValues["sValue"])
+        if "dependantSwitch" in self.units[unit] and self.units[unit]["dependantSwitch"]["ifValue"] == updateValues["sValue"].lower():
+            self.updateDomoticzDevice(self.units[unit]["dependantSwitch"]["unit"], updateValues["nValue"], self.units[unit]["dependantSwitch"]["setValue"])
+        return
     
     def powerSwitchCurrentValue(self, dsn):
         return self.acs[dsn]["ac"].operation_mode_desc
