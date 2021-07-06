@@ -26,4 +26,5 @@ If Domoticz started, then go to the Hardware page on your Domoticz website and a
    - Username (the email address of your FGLair account)
    - Password (the password for your FGLair account)
    - Region (your region(EU, CN or other))
+   - Refresh interval
    - Debug (you cn turn on or off debug messages)
