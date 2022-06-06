@@ -691,6 +691,7 @@ class FujitsuACPlugin:
 
     def onStop(self):
         Domoticz.Log("onStop called")
+        self.helper.clean_up()
         return
 
     def onConnect(self, Connection, Status, Description):
