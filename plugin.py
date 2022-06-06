@@ -3,7 +3,7 @@
 # Author: 593304
 #
 """
-<plugin key="FujitsuACPlugin" name="Fujitsu AC Plugin" author="593304" version="0.3" externallink="https://github.com/593304/Domoticz-Fujitsu-AC">
+<plugin key="FujitsuACPlugin" name="Fujitsu AC Plugin" author="593304" version="0.4" externallink="https://github.com/593304/Domoticz-Fujitsu-AC">
     <description>
         <h2>Fujitsu AC Plugin</h2><br/>
         <p>The plugin will connect to the cloud solution behind the FGLair app to control your air conditioner. The FGLair app's username(e-mail address) and password is necessary.</p>
@@ -46,9 +46,12 @@
 """
 import Domoticz
 from pyfujitseu import splitAC
-import json
+
+import os
+import tempfile
 
 DATABASE_KEY = "FujitsuACPlugin"
+
 
 # Configuration Helpers
 def getConfigItem():
@@ -62,6 +65,7 @@ def getConfigItem():
         Domoticz.Error("Domoticz.Configuration read failed: '%s'" % (str(inst)))
     return value
     
+
 def setConfigItem(value):
     config = {}
     try:
@@ -74,7 +78,7 @@ def setConfigItem(value):
 
 
 # Simple heartbeat with 5-180 secs interval
-class Heartbeat():
+class Heartbeat:
     def __init__(self, interval):
         self.callback = None
         self.interval = interval
@@ -104,7 +108,7 @@ class Heartbeat():
             self.callback()
 
 
-class Helper():
+class Helper:
     def __init__(self, username, password, region):
         self.username = username
         self.password = password
@@ -114,6 +118,8 @@ class Helper():
         self.databaseStore = {}
         self.units = {}
         self.selectorData = {}
+
+        self.token_memory_file_name = None
         return
     
     def _getNextUnitClass(self):
@@ -132,8 +138,17 @@ class Helper():
         }
         self.databaseStore[dsn] = unitClass
     
+    def get_api(self):
+        if self.token_memory_file_name is None:
+            self.token_memory_file_name = tempfile.NamedTemporaryFile(delete=False).name
+        return splitAC.api(self.username, self.password, self.region, tokenpath=self.token_memory_file_name)
+
+    def clean_up(self):
+        if self.token_memory_file_name is not None:
+            os.unlink(self.token_memory_file_name)
+
     def getAcs(self):
-        api = splitAC.api(self.username, self.password, self.region)
+        api = self.get_api()
         dsns = api.get_devices_dsn()
         Domoticz.Log("Connected to FGLair API and found %d device(s) for %s" % (len(dsns), self.username))
 
@@ -160,7 +175,7 @@ class Helper():
         return
     
     def updateAcs(self):
-        api = splitAC.api(self.username, self.password, self.region)
+        api = self.get_api()
         dsns = api.get_devices_dsn()
         foundNewDevice = False
         for dsn in dsns:
